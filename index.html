@@ -1,0 +1,1140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Radiant — Your Daily Compliment</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,700;1,400;1,600&family=DM+Sans:wght@300;400;500;600&family=Lora:ital,wght@1,400;1,500&display=swap" rel="stylesheet" />
+  <!-- No external confetti library needed — self-contained implementation below -->
+
+  <style>
+    /* ============================================================
+       CSS CUSTOM PROPERTIES — Design tokens for entire app
+    ============================================================ */
+    :root {
+      --bg:           #FFFBF5;
+      --surface:      #FFF5E4;
+      --surface-2:    #FFECD0;
+      --accent:       #FF6B6B;
+      --accent-2:     #FFB347;
+      --cta:          #FF8C69;
+      --cta-hover:    #FF6B47;
+      --text:         #2D2D2D;
+      --text-subtle:  #9E9E9E;
+      --text-light:   #C5B9A8;
+      --shadow:       rgba(255, 107, 107, 0.18);
+      --shadow-deep:  rgba(45, 45, 45, 0.12);
+      --radius:       20px;
+      --radius-sm:    12px;
+      --transition:   0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+      --ease:         0.25s ease;
+    }
+
+    /* ---- Dark Mode Overrides ---- */
+    body.dark {
+      --bg:          #1E1A18;
+      --surface:     #2C2420;
+      --surface-2:   #3A302A;
+      --text:        #F5ECD7;
+      --text-subtle: #8A7A6A;
+      --text-light:  #5A4A3A;
+      --shadow:      rgba(255, 107, 107, 0.12);
+      --shadow-deep: rgba(0, 0, 0, 0.4);
+    }
+
+    /* ============================================================
+       RESET & BASE
+    ============================================================ */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'DM Sans', sans-serif;
+      background-color: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem 4rem;
+      transition: background-color 0.4s ease, color 0.4s ease;
+      overflow-x: hidden;
+    }
+
+    /* Subtle warm grain texture overlay */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      pointer-events: none;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+      background-repeat: repeat;
+      background-size: 200px;
+      z-index: 0;
+      opacity: 0.5;
+    }
+
+    /* ============================================================
+       LAYOUT WRAPPER
+    ============================================================ */
+    .wrapper {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 680px;
+      display: flex;
+      flex-direction: column;
+      gap: 2rem;
+    }
+
+    /* ============================================================
+       HEADER
+    ============================================================ */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      padding-top: 0.5rem;
+    }
+
+    .brand {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .brand-title {
+      font-family: 'Playfair Display', serif;
+      font-size: clamp(2rem, 5vw, 2.8rem);
+      font-weight: 700;
+      line-height: 1.05;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--accent-2) 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      letter-spacing: -0.02em;
+    }
+
+    .brand-sub {
+      font-size: 0.82rem;
+      font-weight: 400;
+      color: var(--text-subtle);
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      margin-top: 0.15rem;
+    }
+
+    /* Dark mode toggle */
+    .theme-btn {
+      background: var(--surface);
+      border: 1.5px solid var(--surface-2);
+      border-radius: 50px;
+      width: 52px;
+      height: 28px;
+      cursor: pointer;
+      position: relative;
+      transition: background 0.3s ease, border-color 0.3s ease;
+      flex-shrink: 0;
+      margin-top: 0.6rem;
+    }
+
+    .theme-btn::after {
+      content: '☀️';
+      position: absolute;
+      font-size: 0.75rem;
+      top: 50%;
+      left: 4px;
+      transform: translateY(-50%);
+      transition: left var(--ease), content 0.2s;
+    }
+
+    body.dark .theme-btn::after {
+      content: '🌙';
+      left: 26px;
+    }
+
+    body.dark .theme-btn {
+      background: var(--surface-2);
+      border-color: #4A3828;
+    }
+
+    /* ============================================================
+       PERSONALIZATION SECTION
+    ============================================================ */
+    .name-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+
+    .name-section label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--text-subtle);
+    }
+
+    .name-input-wrap {
+      position: relative;
+    }
+
+    .name-input {
+      width: 100%;
+      padding: 0.9rem 1.2rem;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1.05rem;
+      font-weight: 400;
+      color: var(--text);
+      background: var(--surface);
+      border: 2px solid transparent;
+      border-radius: var(--radius-sm);
+      outline: none;
+      transition: border-color 0.25s ease, box-shadow 0.25s ease, background 0.3s ease;
+    }
+
+    .name-input::placeholder { color: var(--text-light); }
+
+    .name-input:focus {
+      border-color: var(--cta);
+      box-shadow: 0 0 0 4px rgba(255, 140, 105, 0.15);
+    }
+
+    /* ============================================================
+       CATEGORY SELECTOR
+    ============================================================ */
+    .category-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+
+    .category-section label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--text-subtle);
+    }
+
+    .categories {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 0.6rem;
+    }
+
+    @media (min-width: 440px) {
+      .categories { grid-template-columns: repeat(4, 1fr); }
+    }
+
+    .cat-btn {
+      background: var(--surface);
+      border: 2px solid transparent;
+      border-radius: var(--radius-sm);
+      padding: 0.7rem 0.5rem;
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.82rem;
+      font-weight: 500;
+      color: var(--text-subtle);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.35rem;
+      transition: border-color 0.2s ease, color 0.2s ease, background 0.2s ease, transform 0.15s ease, box-shadow 0.2s ease;
+    }
+
+    .cat-btn .emoji { font-size: 1.4rem; line-height: 1; }
+
+    .cat-btn:hover {
+      border-color: var(--surface-2);
+      color: var(--text);
+      transform: translateY(-2px);
+    }
+
+    .cat-btn.active {
+      border-color: var(--cta);
+      color: var(--cta);
+      background: rgba(255, 140, 105, 0.08);
+      box-shadow: 0 4px 16px var(--shadow);
+    }
+
+    body.dark .cat-btn.active {
+      background: rgba(255, 140, 105, 0.12);
+    }
+
+    /* ============================================================
+       COMPLIMENT CARD
+    ============================================================ */
+    .card-wrap {
+      perspective: 1000px;
+    }
+
+    .compliment-card {
+      background: var(--surface);
+      border-radius: var(--radius);
+      padding: 2.5rem 2rem;
+      box-shadow: 0 8px 40px var(--shadow-deep), 0 2px 8px var(--shadow);
+      position: relative;
+      overflow: hidden;
+      transition: background 0.4s ease, box-shadow 0.4s ease;
+      min-height: 180px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 1.2rem;
+    }
+
+    /* Decorative corner accent */
+    .compliment-card::before {
+      content: '';
+      position: absolute;
+      top: -30px;
+      right: -30px;
+      width: 100px;
+      height: 100px;
+      background: radial-gradient(circle, rgba(255, 179, 71, 0.25) 0%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .compliment-card::after {
+      content: '';
+      position: absolute;
+      bottom: -20px;
+      left: -20px;
+      width: 70px;
+      height: 70px;
+      background: radial-gradient(circle, rgba(255, 107, 107, 0.2) 0%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+
+    .card-category-tag {
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: var(--cta);
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 0.3s ease 0.1s, transform 0.3s ease 0.1s;
+    }
+
+    .card-category-tag.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .compliment-text {
+      font-family: 'Lora', serif;
+      font-style: italic;
+      font-size: clamp(1.15rem, 3vw, 1.45rem);
+      font-weight: 500;
+      line-height: 1.6;
+      color: var(--text);
+      position: relative;
+      z-index: 1;
+
+      /* Fade/slide animation state */
+      opacity: 1;
+      transform: translateY(0);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+    }
+
+    .compliment-text.exiting {
+      opacity: 0;
+      transform: translateY(-12px);
+    }
+
+    .compliment-text.entering {
+      opacity: 0;
+      transform: translateY(12px);
+    }
+
+    /* Opening quotation mark */
+    .compliment-text::before {
+      content: '\201C';
+      font-family: 'Playfair Display', serif;
+      font-size: 3.5rem;
+      line-height: 0;
+      vertical-align: -0.7rem;
+      margin-right: 0.1rem;
+      color: var(--accent-2);
+      opacity: 0.6;
+      font-style: normal;
+    }
+
+    .card-meta {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 1rem;
+      flex-wrap: wrap;
+    }
+
+    .card-recipient {
+      font-size: 0.8rem;
+      font-weight: 500;
+      color: var(--text-subtle);
+      opacity: 0;
+      transform: translateY(4px);
+      transition: opacity 0.3s ease 0.15s, transform 0.3s ease 0.15s;
+    }
+
+    .card-recipient.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .card-actions {
+      display: flex;
+      gap: 0.5rem;
+      align-items: center;
+    }
+
+    /* Icon action buttons (copy, share) */
+    .action-btn {
+      background: var(--bg);
+      border: 1.5px solid var(--surface-2);
+      border-radius: 50px;
+      padding: 0.45rem 0.9rem;
+      font-family: 'DM Sans', sans-serif;
+      font-size: 0.78rem;
+      font-weight: 500;
+      color: var(--text-subtle);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 0.35rem;
+      transition: background 0.2s, border-color 0.2s, color 0.2s, transform 0.15s;
+    }
+
+    .action-btn:hover {
+      background: var(--surface-2);
+      color: var(--text);
+      transform: scale(1.04);
+    }
+
+    .action-btn.copied {
+      border-color: #4CAF82;
+      color: #4CAF82;
+      background: rgba(76, 175, 130, 0.08);
+    }
+
+    /* ============================================================
+       GENERATE BUTTON
+    ============================================================ */
+    .generate-btn {
+      width: 100%;
+      padding: 1.05rem 2rem;
+      background: linear-gradient(135deg, var(--cta) 0%, var(--accent) 100%);
+      color: white;
+      border: none;
+      border-radius: var(--radius-sm);
+      font-family: 'DM Sans', sans-serif;
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      cursor: pointer;
+      position: relative;
+      overflow: hidden;
+      transition: transform 0.15s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+      box-shadow: 0 4px 20px rgba(255, 107, 107, 0.35);
+    }
+
+    .generate-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 8px 28px rgba(255, 107, 107, 0.45);
+    }
+
+    .generate-btn:active {
+      transform: translateY(0) scale(0.985);
+    }
+
+    /* Ripple shimmer on button */
+    .generate-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.18), transparent);
+      transform: translateX(-100%);
+    }
+
+    .generate-btn.shimmer::after {
+      animation: shimmer 0.6s ease forwards;
+    }
+
+    @keyframes shimmer {
+      to { transform: translateX(100%); }
+    }
+
+    .generate-btn .btn-inner {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0.5rem;
+    }
+
+    .generate-btn .btn-icon {
+      font-size: 1.1rem;
+      transition: transform var(--transition);
+    }
+
+    .generate-btn:hover .btn-icon {
+      transform: rotate(180deg) scale(1.1);
+    }
+
+    /* ============================================================
+       HISTORY SECTION
+    ============================================================ */
+    .history-section {
+      display: flex;
+      flex-direction: column;
+      gap: 0.65rem;
+    }
+
+    .history-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .history-header span {
+      font-size: 0.8rem;
+      font-weight: 600;
+      letter-spacing: 0.07em;
+      text-transform: uppercase;
+      color: var(--text-subtle);
+    }
+
+    .clear-btn {
+      background: none;
+      border: none;
+      font-size: 0.75rem;
+      color: var(--text-light);
+      cursor: pointer;
+      font-family: 'DM Sans', sans-serif;
+      padding: 0.2rem 0.4rem;
+      border-radius: 4px;
+      transition: color 0.2s, background 0.2s;
+    }
+
+    .clear-btn:hover { color: var(--accent); background: rgba(255,107,107,0.07); }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+
+    .history-item {
+      background: var(--surface);
+      border-radius: var(--radius-sm);
+      padding: 0.8rem 1rem;
+      font-family: 'Lora', serif;
+      font-style: italic;
+      font-size: 0.88rem;
+      color: var(--text-subtle);
+      line-height: 1.5;
+      border-left: 3px solid var(--surface-2);
+      transition: border-color 0.2s, color 0.2s;
+      animation: slideIn 0.3s ease;
+    }
+
+    .history-item:hover {
+      border-left-color: var(--accent-2);
+      color: var(--text);
+    }
+
+    @keyframes slideIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    .history-empty {
+      font-size: 0.85rem;
+      color: var(--text-light);
+      text-align: center;
+      padding: 1rem 0;
+      font-style: italic;
+    }
+
+    /* ============================================================
+       FOOTER
+    ============================================================ */
+    footer {
+      text-align: center;
+      font-size: 0.75rem;
+      color: var(--text-light);
+      padding-top: 0.5rem;
+    }
+
+    footer a {
+      color: var(--cta);
+      text-decoration: none;
+    }
+
+    /* ============================================================
+       RESPONSIVE ADJUSTMENTS
+    ============================================================ */
+    @media (max-width: 380px) {
+      .compliment-card { padding: 1.8rem 1.4rem; }
+      .compliment-text { font-size: 1.05rem; }
+      .card-meta { flex-direction: column; align-items: flex-start; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrapper" role="main">
+
+    <!-- ============================================================
+         HEADER
+    ============================================================ -->
+    <header>
+      <div class="brand">
+        <h1 class="brand-title">Radiant</h1>
+        <p class="brand-sub">Daily compliments, just for you</p>
+      </div>
+      <button class="theme-btn" id="themeBtn" aria-label="Toggle dark mode" title="Toggle dark mode"></button>
+    </header>
+
+    <!-- ============================================================
+         NAME INPUT
+    ============================================================ -->
+    <div class="name-section">
+      <label for="nameInput">Your name</label>
+      <div class="name-input-wrap">
+        <input
+          type="text"
+          id="nameInput"
+          class="name-input"
+          placeholder="Enter your name…"
+          maxlength="40"
+          aria-label="Your name"
+          autocomplete="given-name"
+        />
+      </div>
+    </div>
+
+    <!-- ============================================================
+         CATEGORY SELECTOR
+    ============================================================ -->
+    <div class="category-section" role="group" aria-label="Compliment category">
+      <label>Mood</label>
+      <div class="categories">
+        <button class="cat-btn active" data-category="funny" aria-pressed="true">
+          <span class="emoji">😄</span>
+          Funny
+        </button>
+        <button class="cat-btn" data-category="heartfelt" aria-pressed="false">
+          <span class="emoji">💛</span>
+          Heartfelt
+        </button>
+        <button class="cat-btn" data-category="motivational" aria-pressed="false">
+          <span class="emoji">🚀</span>
+          Motivational
+        </button>
+        <button class="cat-btn" data-category="romantic" aria-pressed="false">
+          <span class="emoji">💕</span>
+          Romantic
+        </button>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         COMPLIMENT CARD
+    ============================================================ -->
+    <div class="card-wrap">
+      <div class="compliment-card" id="complimentCard" aria-live="polite" aria-atomic="true">
+        <div class="card-category-tag" id="cardTag"></div>
+        <p class="compliment-text" id="complimentText">
+          Hit the button below and let the magic begin ✨
+        </p>
+        <div class="card-meta">
+          <span class="card-recipient" id="cardRecipient"></span>
+          <div class="card-actions">
+            <button class="action-btn" id="copyBtn" aria-label="Copy compliment to clipboard">
+              📋 Copy
+            </button>
+            <button class="action-btn" id="shareBtn" aria-label="Share on Twitter / X">
+              𝕏 Share
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         GENERATE BUTTON
+    ============================================================ -->
+    <button class="generate-btn" id="generateBtn" aria-label="Generate a new compliment">
+      <span class="btn-inner">
+        <span class="btn-icon">✦</span>
+        Generate Compliment
+      </span>
+    </button>
+
+    <!-- ============================================================
+         HISTORY SECTION
+    ============================================================ -->
+    <div class="history-section" id="historySection" aria-label="Compliment history">
+      <div class="history-header">
+        <span>Recent</span>
+        <button class="clear-btn" id="clearBtn" aria-label="Clear history">Clear</button>
+      </div>
+      <div class="history-list" id="historyList" role="list">
+        <p class="history-empty" id="historyEmpty">Your compliment history will appear here.</p>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         FOOTER
+    ============================================================ -->
+    <footer>
+      Made with 💛 · A portfolio project by <a href="#" aria-label="Portfolio link">Your Name</a>
+    </footer>
+
+  </div><!-- /.wrapper -->
+
+  <script>
+    /* ============================================================
+       COMPLIMENT DATA — 50+ compliments across 4 categories
+       {NAME} is replaced with the user's name at runtime.
+    ============================================================ */
+    const COMPLIMENTS = {
+      funny: [
+        "If brilliance were a renewable energy source, {NAME}, you'd have solved the climate crisis by now.",
+        "{NAME}, you're the human equivalent of finding money in an old jacket. Unexpected and absolutely wonderful.",
+        "Scientists have confirmed that {NAME}'s laugh has measurable healing properties. More research is needed, but the results are promising.",
+        "If coolness were taxed, {NAME}, you'd be in the highest bracket.",
+        "{NAME}, you're so charming that even spam emails are hoping you'll reply.",
+        "They say talent skips a generation — good thing {NAME} showed up to catch it.",
+        "{NAME}, you radiate the same energy as freshly baked bread: warm, comforting, and irresistible.",
+        "The Wi-Fi gets stronger whenever {NAME} walks into the room. Nobody knows why.",
+        "{NAME}, if you were a font, you'd be Times New Roman Bold — classic, powerful, and always the right choice.",
+        "Somewhere, a motivational poster is taking notes from {NAME}.",
+        "{NAME}, you have the rare gift of making everything seem slightly more possible.",
+        "History books are already arguing over which chapter to put {NAME} in.",
+        "{NAME}, your vibe is so good it's technically a controlled substance.",
+        "Mirrors love {NAME}. They have excellent taste.",
+      ],
+      heartfelt: [
+        "{NAME}, the world is genuinely a more beautiful place because you're in it.",
+        "There's a rare kind of warmth that {NAME} carries everywhere — it's the kind you feel long after they've left the room.",
+        "{NAME}, your kindness is one of those things people remember for the rest of their lives.",
+        "The care {NAME} gives to the people around them is nothing short of extraordinary.",
+        "{NAME}, you have an incredible gift for making others feel seen, heard, and valued.",
+        "The way {NAME} loves the people in their life is something truly special.",
+        "{NAME}, your presence makes every ordinary moment feel a little more meaningful.",
+        "Something changes for the better whenever {NAME} decides to show up for someone.",
+        "{NAME}, you have a heart that holds more room for others than most people ever find.",
+        "The quiet strength {NAME} carries is one of the most beautiful things about them.",
+        "{NAME}, your empathy is a gift — rare, generous, and deeply felt by everyone lucky enough to receive it.",
+        "Some people leave traces of kindness wherever they go. {NAME} is one of those people.",
+        "{NAME}, you make the world softer for the people around you, and that is no small thing.",
+      ],
+      motivational: [
+        "{NAME}, the version of you that exists five years from now is going to look back at this moment with deep gratitude.",
+        "Every challenge {NAME} has navigated so far has been preparing them for something remarkable.",
+        "{NAME}, the courage it takes to keep going when things are hard is not nothing — it's everything.",
+        "There is a kind of quiet determination in {NAME} that moves mountains without making a sound.",
+        "{NAME}, the gap between where you are and where you're going is smaller than it looks right now.",
+        "Every great story has a chapter where things are uncertain. {NAME}, you're in that chapter — and you're writing it beautifully.",
+        "{NAME}, the work you're putting in is compounding in ways you can't fully see yet. Keep going.",
+        "Progress isn't always loud. Sometimes it looks like {NAME}, showing up anyway.",
+        "{NAME}, you are far more capable than the voice in your head that says otherwise.",
+        "The version of {NAME} who started is not the version who will finish — and that growth is extraordinary.",
+        "{NAME}, everything you need to get to the next level is already inside you.",
+        "Not everyone has the tenacity that {NAME} brings to the things that matter most to them. That's rare.",
+        "{NAME}, the hardest part of any great thing is deciding to begin. You've already done that.",
+      ],
+      romantic: [
+        "{NAME}, there are people who make the world pause for a moment — you're one of them.",
+        "In a room full of people, {NAME} is the first thing worth noticing.",
+        "{NAME}, there's something about the way you exist that makes everything feel a little more romantic.",
+        "Every love song ever written was reaching, in some way, toward someone like {NAME}.",
+        "{NAME}, the world becomes a more beautiful place whenever you decide to smile.",
+        "If warmth had a face, {NAME}, it would look just like yours.",
+        "{NAME}, you have the rare quality of making someone feel like the only person in the room.",
+        "There's a gravity to {NAME} — the kind that makes people lean a little closer without realizing it.",
+        "{NAME}, you are exactly the kind of person someone writes letters to.",
+        "The way {NAME} carries themselves is the kind of thing people try to describe and somehow never quite capture.",
+        "{NAME}, you have a presence that lingers in all the best ways.",
+        "There are people whose laughter stays with you. {NAME}, yours is one of them.",
+        "{NAME}, you are someone worth crossing rooms for.",
+      ],
+    };
+
+    /* ============================================================
+       STATE — tracks the current app state
+    ============================================================ */
+    const state = {
+      category: 'funny',
+      currentCompliment: '',
+      history: [],
+      MAX_HISTORY: 5,
+    };
+
+    /* ============================================================
+       DOM REFERENCES
+    ============================================================ */
+    const nameInput     = document.getElementById('nameInput');
+    const generateBtn   = document.getElementById('generateBtn');
+    const complimentText = document.getElementById('complimentText');
+    const cardTag       = document.getElementById('cardTag');
+    const cardRecipient = document.getElementById('cardRecipient');
+    const copyBtn       = document.getElementById('copyBtn');
+    const shareBtn      = document.getElementById('shareBtn');
+    const themeBtn      = document.getElementById('themeBtn');
+    const historyList   = document.getElementById('historyList');
+    const historyEmpty  = document.getElementById('historyEmpty');
+    const clearBtn      = document.getElementById('clearBtn');
+    const catButtons    = document.querySelectorAll('.cat-btn');
+
+    /* ============================================================
+       INITIALIZATION — runs on page load
+    ============================================================ */
+    function init() {
+      loadFromStorage();
+      renderHistory();
+      attachEventListeners();
+    }
+
+    /* ============================================================
+       LOAD FROM localStorage — restores dark mode + history
+    ============================================================ */
+    function loadFromStorage() {
+      try {
+        const savedDark = localStorage.getItem('radiant_dark');
+        if (savedDark === 'true') document.body.classList.add('dark');
+
+        const savedHistory = localStorage.getItem('radiant_history');
+        if (savedHistory) state.history = JSON.parse(savedHistory);
+
+        const savedName = localStorage.getItem('radiant_name');
+        if (savedName) nameInput.value = savedName;
+      } catch (e) {
+        // localStorage unavailable — degrade gracefully
+      }
+    }
+
+    /* ============================================================
+       SAVE TO localStorage
+    ============================================================ */
+    function saveToStorage() {
+      try {
+        localStorage.setItem('radiant_history', JSON.stringify(state.history));
+        localStorage.setItem('radiant_name', nameInput.value.trim());
+      } catch (e) { /* silent fail */ }
+    }
+
+    /* ============================================================
+       EVENT LISTENERS — wire up all interactive elements
+    ============================================================ */
+    function attachEventListeners() {
+      generateBtn.addEventListener('click', handleGenerate);
+      copyBtn.addEventListener('click', handleCopy);
+      shareBtn.addEventListener('click', handleShare);
+      themeBtn.addEventListener('click', handleThemeToggle);
+      clearBtn.addEventListener('click', handleClearHistory);
+      nameInput.addEventListener('input', () => saveToStorage());
+
+      catButtons.forEach(btn => {
+        btn.addEventListener('click', () => handleCategorySelect(btn));
+      });
+    }
+
+    /* ============================================================
+       HANDLE CATEGORY SELECTION
+    ============================================================ */
+    function handleCategorySelect(selectedBtn) {
+      catButtons.forEach(btn => {
+        btn.classList.remove('active');
+        btn.setAttribute('aria-pressed', 'false');
+      });
+      selectedBtn.classList.add('active');
+      selectedBtn.setAttribute('aria-pressed', 'true');
+      state.category = selectedBtn.dataset.category;
+    }
+
+    /* ============================================================
+       HANDLE GENERATE — picks a random compliment and animates
+    ============================================================ */
+    function handleGenerate() {
+      const pool = COMPLIMENTS[state.category];
+      const name = nameInput.value.trim();
+
+      // Pick a random compliment, avoiding immediate repeats
+      let newCompliment;
+      let attempts = 0;
+      do {
+        newCompliment = pool[Math.floor(Math.random() * pool.length)];
+        attempts++;
+      } while (newCompliment === state.currentCompliment && pool.length > 1 && attempts < 10);
+
+      // Personalize with name or generic pronoun
+      const displayName = name || 'you';
+      const personalized = newCompliment.replace(/\{NAME\}/g, displayName);
+
+      state.currentCompliment = newCompliment; // store template for dedup
+
+      // Animate card transition
+      animateCardTransition(() => {
+        complimentText.textContent = personalized;
+
+        // Update category tag
+        const categoryLabels = {
+          funny: '😄 Funny',
+          heartfelt: '💛 Heartfelt',
+          motivational: '🚀 Motivational',
+          romantic: '💕 Romantic',
+        };
+        cardTag.textContent = categoryLabels[state.category];
+        cardTag.classList.add('visible');
+
+        // Update recipient line
+        if (name) {
+          cardRecipient.textContent = `For ${name} ✦`;
+          cardRecipient.classList.add('visible');
+        } else {
+          cardRecipient.textContent = '';
+          cardRecipient.classList.remove('visible');
+        }
+      });
+
+      // Add to history
+      addToHistory(personalized);
+
+      // Shimmer the button
+      generateBtn.classList.remove('shimmer');
+      void generateBtn.offsetWidth; // force reflow
+      generateBtn.classList.add('shimmer');
+
+      // Confetti 🎉
+      fireConfetti();
+    }
+
+    /* ============================================================
+       ANIMATE CARD TRANSITION — fade out / in the text
+    ============================================================ */
+    function animateCardTransition(updateFn) {
+      complimentText.classList.add('exiting');
+      setTimeout(() => {
+        updateFn();
+        complimentText.classList.remove('exiting');
+        complimentText.classList.add('entering');
+        // Small delay to let browser register the class
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            complimentText.classList.remove('entering');
+          });
+        });
+      }, 280);
+    }
+
+    /* ============================================================
+       HANDLE COPY — copies compliment to clipboard
+    ============================================================ */
+    function handleCopy() {
+      const text = complimentText.textContent;
+      if (!text || text.includes('Hit the button')) return;
+
+      navigator.clipboard.writeText(text).then(() => {
+        copyBtn.textContent = '✓ Copied!';
+        copyBtn.classList.add('copied');
+        setTimeout(() => {
+          copyBtn.innerHTML = '📋 Copy';
+          copyBtn.classList.remove('copied');
+        }, 2200);
+      }).catch(() => {
+        // Fallback for older browsers
+        const ta = document.createElement('textarea');
+        ta.value = text;
+        ta.style.position = 'fixed';
+        ta.style.opacity = '0';
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand('copy');
+        document.body.removeChild(ta);
+        copyBtn.textContent = '✓ Copied!';
+        copyBtn.classList.add('copied');
+        setTimeout(() => {
+          copyBtn.innerHTML = '📋 Copy';
+          copyBtn.classList.remove('copied');
+        }, 2200);
+      });
+    }
+
+    /* ============================================================
+       HANDLE SHARE — opens a pre-filled tweet on Twitter/X
+    ============================================================ */
+    function handleShare() {
+      const text = complimentText.textContent;
+      if (!text || text.includes('Hit the button')) return;
+
+      const tweet = `"${text}" ✨ — via Radiant`;
+      const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}`;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
+
+    /* ============================================================
+       HANDLE THEME TOGGLE — switches dark / light mode
+    ============================================================ */
+    function handleThemeToggle() {
+      document.body.classList.toggle('dark');
+      try {
+        localStorage.setItem('radiant_dark', document.body.classList.contains('dark'));
+      } catch (e) { /* silent */ }
+    }
+
+    /* ============================================================
+       ADD TO HISTORY — keeps last 5 compliments
+    ============================================================ */
+    function addToHistory(compliment) {
+      // Avoid duplicate consecutive entries
+      if (state.history[0] === compliment) return;
+
+      state.history.unshift(compliment);
+      if (state.history.length > state.MAX_HISTORY) {
+        state.history = state.history.slice(0, state.MAX_HISTORY);
+      }
+      saveToStorage();
+      renderHistory();
+    }
+
+    /* ============================================================
+       RENDER HISTORY — updates the DOM history list
+    ============================================================ */
+    function renderHistory() {
+      historyList.innerHTML = '';
+
+      if (state.history.length === 0) {
+        historyList.appendChild(historyEmpty);
+        historyEmpty.style.display = '';
+        return;
+      }
+
+      historyEmpty.style.display = 'none';
+
+      state.history.forEach((item) => {
+        const el = document.createElement('div');
+        el.className = 'history-item';
+        el.setAttribute('role', 'listitem');
+        el.textContent = item;
+        historyList.appendChild(el);
+      });
+    }
+
+    /* ============================================================
+       HANDLE CLEAR HISTORY
+    ============================================================ */
+    function handleClearHistory() {
+      state.history = [];
+      saveToStorage();
+      renderHistory();
+    }
+
+    /* ============================================================
+       FIRE CONFETTI — fully self-contained canvas implementation,
+       no external library, no Web Workers, no blob URLs.
+    ============================================================ */
+    function fireConfetti() {
+      const COLORS = ['#FF6B6B', '#FFB347', '#FF8C69', '#FFF5E4', '#F7B7A3', '#FFD580'];
+      const COUNT  = 70;
+      const GRAVITY = 0.45;
+      const DRAG    = 0.96;
+      const TTL     = 160; // frames
+
+      // Create / reuse a full-screen canvas overlay
+      let canvas = document.getElementById('confetti-canvas');
+      if (!canvas) {
+        canvas = document.createElement('canvas');
+        canvas.id = 'confetti-canvas';
+        Object.assign(canvas.style, {
+          position: 'fixed',
+          top: '0', left: '0',
+          width: '100%', height: '100%',
+          pointerEvents: 'none',
+          zIndex: '9999',
+        });
+        document.body.appendChild(canvas);
+      }
+
+      canvas.width  = window.innerWidth;
+      canvas.height = window.innerHeight;
+      const ctx = canvas.getContext('2d');
+
+      // Spawn particles from the middle-top of the viewport
+      const originX = canvas.width  * 0.5;
+      const originY = canvas.height * 0.45;
+
+      const particles = Array.from({ length: COUNT }, () => {
+        const angle = (Math.random() * Math.PI * 1.4) - (Math.PI * 0.7); // fan upward
+        const speed = 6 + Math.random() * 8;
+        return {
+          x:    originX + (Math.random() - 0.5) * 60,
+          y:    originY,
+          vx:   Math.cos(angle) * speed,
+          vy:   Math.sin(angle) * speed - 3,
+          w:    5 + Math.random() * 6,
+          h:    3 + Math.random() * 4,
+          rot:  Math.random() * Math.PI * 2,
+          rotV: (Math.random() - 0.5) * 0.25,
+          color: COLORS[Math.floor(Math.random() * COLORS.length)],
+          life: TTL,
+        };
+      });
+
+      let frame;
+      let tick = 0;
+
+      function draw() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        let alive = false;
+
+        particles.forEach(p => {
+          if (p.life <= 0) return;
+          alive = true;
+
+          p.vy += GRAVITY;
+          p.vx *= DRAG;
+          p.vy *= DRAG;
+          p.x  += p.vx;
+          p.y  += p.vy;
+          p.rot += p.rotV;
+          p.life--;
+
+          ctx.save();
+          ctx.globalAlpha = Math.min(1, p.life / 30); // fade out near end
+          ctx.translate(p.x, p.y);
+          ctx.rotate(p.rot);
+          ctx.fillStyle = p.color;
+          ctx.fillRect(-p.w / 2, -p.h / 2, p.w, p.h);
+          ctx.restore();
+        });
+
+        tick++;
+        if (alive && tick < TTL + 60) {
+          frame = requestAnimationFrame(draw);
+        } else {
+          ctx.clearRect(0, 0, canvas.width, canvas.height);
+          cancelAnimationFrame(frame);
+        }
+      }
+
+      cancelAnimationFrame(frame);
+      tick = 0;
+      draw();
+    }
+
+    /* ============================================================
+       KICK OFF
+    ============================================================ */
+    init();
+  </script>
+</body>
+</html>

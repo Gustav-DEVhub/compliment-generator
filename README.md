@@ -111,10 +111,6 @@ Works in all modern browsers (Chrome, Firefox, Safari, Edge). Requires ES6+ and 
 
 ---
 
-## License
-
-MIT — free to use, modify, and distribute.
-
 ---
 
 Made with 💛 by [Gustav](https://github.com/Gustav-DEVhub)

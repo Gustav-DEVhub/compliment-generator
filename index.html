@@ -451,6 +451,70 @@
       background: rgba(76, 175, 130, 0.08);
     }
 
+    /* Favorite button */
+    .fav-btn {
+      font-size: 1rem;
+      padding: 0.45rem 0.7rem;
+      transition: transform 0.2s var(--transition), border-color 0.2s, color 0.2s, background 0.2s;
+    }
+
+    .fav-btn.favorited {
+      border-color: var(--accent-2);
+      color: var(--accent-2);
+      background: rgba(255, 179, 71, 0.12);
+    }
+
+    .fav-btn.favorited:hover {
+      border-color: #FF6B6B;
+      color: #FF6B6B;
+      background: rgba(255, 107, 107, 0.1);
+    }
+
+    .fav-btn.pop {
+      animation: favPop 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    @keyframes favPop {
+      0%   { transform: scale(1); }
+      50%  { transform: scale(1.4); }
+      100% { transform: scale(1); }
+    }
+
+    /* Favorite list items — slightly gold accent */
+    .favorites-item {
+      background: var(--surface);
+      border-radius: var(--radius-sm);
+      padding: 0.8rem 1rem;
+      font-family: 'Lora', serif;
+      font-style: italic;
+      font-size: 0.88rem;
+      color: var(--text-subtle);
+      line-height: 1.5;
+      border-left: 3px solid var(--accent-2);
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 0.75rem;
+      animation: slideIn 0.3s ease;
+      transition: color 0.2s;
+    }
+
+    .favorites-item:hover { color: var(--text); }
+
+    .fav-remove-btn {
+      background: none;
+      border: none;
+      font-size: 0.8rem;
+      color: var(--text-light);
+      cursor: pointer;
+      padding: 0;
+      flex-shrink: 0;
+      line-height: 1.6;
+      transition: color 0.2s;
+    }
+
+    .fav-remove-btn:hover { color: var(--accent); }
+
     /* Social share icon buttons */
     .share-x  { font-weight: 700; font-size: 0.9rem; }
     .share-li { font-family: 'DM Sans', sans-serif; font-weight: 700; font-size: 0.82rem; letter-spacing: -0.02em; }
@@ -701,6 +765,9 @@
         <div class="card-meta">
           <span class="card-recipient" id="cardRecipient"></span>
           <div class="card-actions">
+            <button class="action-btn fav-btn" id="favBtn" aria-label="Save to favorites" title="Save to favorites">
+              ☆
+            </button>
             <button class="action-btn" id="copyBtn" aria-label="Copy compliment to clipboard">
               📋 Copy
             </button>
@@ -738,6 +805,19 @@
       </div>
       <div class="history-list" id="historyList" role="list">
         <p class="history-empty" id="historyEmpty">Your compliment history will appear here.</p>
+      </div>
+    </div>
+
+    <!-- ============================================================
+         FAVORITES SECTION
+    ============================================================ -->
+    <div class="history-section" id="favoritesSection" aria-label="Favorite compliments">
+      <div class="history-header">
+        <span>⭐ Favorites</span>
+        <button class="clear-btn" id="clearFavBtn" aria-label="Clear all favorites">Clear</button>
+      </div>
+      <div class="history-list" id="favoritesList" role="list">
+        <p class="history-empty" id="favoritesEmpty">Your favorites will appear here.</p>
       </div>
     </div>
 
@@ -925,7 +1005,10 @@
       category: 'funny',
       currentCompliment: '',
       history: [],
+      favorites: [],
       MAX_HISTORY: 5,
+      MAX_FAVORITES: 50,
+      queues: {},
     };
 
     /* ============================================================
@@ -936,6 +1019,7 @@
     const complimentText = document.getElementById('complimentText');
     const cardTag        = document.getElementById('cardTag');
     const cardRecipient  = document.getElementById('cardRecipient');
+    const favBtn         = document.getElementById('favBtn');
     const copyBtn        = document.getElementById('copyBtn');
     const shareXBtn      = document.getElementById('shareXBtn');
     const shareLiBtn     = document.getElementById('shareLiBtn');
@@ -944,6 +1028,9 @@
     const historyList    = document.getElementById('historyList');
     const historyEmpty   = document.getElementById('historyEmpty');
     const clearBtn       = document.getElementById('clearBtn');
+    const favoritesList  = document.getElementById('favoritesList');
+    const favoritesEmpty = document.getElementById('favoritesEmpty');
+    const clearFavBtn    = document.getElementById('clearFavBtn');
     const catButtons     = document.querySelectorAll('.cat-btn');
 
     /* ============================================================
@@ -952,6 +1039,7 @@
     function init() {
       loadFromStorage();
       renderHistory();
+      renderFavorites();
       attachEventListeners();
     }
 
@@ -966,10 +1054,15 @@
         const savedHistory = localStorage.getItem('radiant_history');
         if (savedHistory) state.history = JSON.parse(savedHistory);
 
+        const savedFavorites = localStorage.getItem('radiant_favorites');
+        if (savedFavorites) state.favorites = JSON.parse(savedFavorites);
+
         const savedName = localStorage.getItem('radiant_name');
         if (savedName) nameInput.value = savedName;
       } catch (e) {
-        // localStorage unavailable — degrade gracefully
+        // localStorage unavailable or JSON corrupt — degrade gracefully
+        state.favorites = [];
+        state.history = [];
       }
     }
 
@@ -979,8 +1072,11 @@
     function saveToStorage() {
       try {
         localStorage.setItem('radiant_history', JSON.stringify(state.history));
+        localStorage.setItem('radiant_favorites', JSON.stringify(state.favorites));
         localStorage.setItem('radiant_name', nameInput.value.trim());
-      } catch (e) { /* silent fail */ }
+      } catch (e) {
+        // Storage full or unavailable — fail silently
+      }
     }
 
     /* ============================================================
@@ -988,12 +1084,14 @@
     ============================================================ */
     function attachEventListeners() {
       generateBtn.addEventListener('click', handleGenerate);
+      favBtn.addEventListener('click', handleFavorite);
       copyBtn.addEventListener('click', handleCopy);
       shareXBtn.addEventListener('click', () => handleShare('x'));
       shareLiBtn.addEventListener('click', () => handleShare('linkedin'));
       shareWaBtn.addEventListener('click', () => handleShare('whatsapp'));
       themeBtn.addEventListener('click', handleThemeToggle);
       clearBtn.addEventListener('click', handleClearHistory);
+      clearFavBtn.addEventListener('click', handleClearFavorites);
       nameInput.addEventListener('input', () => saveToStorage());
 
       catButtons.forEach(btn => {
@@ -1015,25 +1113,48 @@
     }
 
     /* ============================================================
+       SHUFFLE — Fisher-Yates in-place array shuffle
+    ============================================================ */
+    function shuffle(arr) {
+      for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+      }
+      return arr;
+    }
+
+    /* ============================================================
+       PICK COMPLIMENT — draws from a per-category shuffled queue.
+       Every compliment is shown once before any repeats occur.
+       When the queue empties it reshuffles and starts again.
+    ============================================================ */
+    function pickCompliment(category) {
+      // Build a fresh shuffled queue if this category has none left
+      if (!state.queues[category] || state.queues[category].length === 0) {
+        const fresh = shuffle([...COMPLIMENTS[category]]);
+        // If last card of previous cycle matches first of new cycle, swap it
+        if (fresh.length > 1 && fresh[0] === state.currentCompliment) {
+          [fresh[0], fresh[1]] = [fresh[1], fresh[0]];
+        }
+        state.queues[category] = fresh;
+      }
+      // Pop the next compliment off the front of the queue
+      return state.queues[category].shift();
+    }
+
+    /* ============================================================
        HANDLE GENERATE — picks a random compliment and animates
     ============================================================ */
     function handleGenerate() {
-      const pool = COMPLIMENTS[state.category];
       const name = nameInput.value.trim();
 
-      // Pick a random compliment, avoiding immediate repeats
-      let newCompliment;
-      let attempts = 0;
-      do {
-        newCompliment = pool[Math.floor(Math.random() * pool.length)];
-        attempts++;
-      } while (newCompliment === state.currentCompliment && pool.length > 1 && attempts < 10);
+      // Draw next compliment from the no-repeat queue
+      const newCompliment = pickCompliment(state.category);
+      state.currentCompliment = newCompliment;
 
-      // Personalize with name or generic pronoun
+      // Personalize with name or generic fallback
       const displayName = name || 'you';
       const personalized = newCompliment.replace(/\{NAME\}/g, displayName);
-
-      state.currentCompliment = newCompliment; // store template for dedup
 
       // Animate card transition
       animateCardTransition(() => {
@@ -1062,6 +1183,9 @@
 
       // Add to history
       addToHistory(personalized);
+
+      // Reset fav button to reflect whether this compliment is already saved
+      updateFavButton(personalized);
 
       // Shimmer the button
       generateBtn.classList.remove('shimmer');
@@ -1196,6 +1320,99 @@
       state.history = [];
       saveToStorage();
       renderHistory();
+    }
+
+    /* ============================================================
+       HANDLE FAVORITE — toggles favorite state for current compliment
+    ============================================================ */
+    function handleFavorite() {
+      const text = complimentText.textContent;
+      if (!text || text.includes('Hit the button')) return;
+
+      const isSaved = state.favorites.includes(text);
+
+      if (isSaved) {
+        // Remove from favorites
+        state.favorites = state.favorites.filter(f => f !== text);
+      } else {
+        // Add to favorites — enforce 50 item cap, no duplicates
+        if (state.favorites.length >= state.MAX_FAVORITES) {
+          state.favorites.pop(); // remove oldest
+        }
+        state.favorites.unshift(text);
+      }
+
+      saveToStorage();
+      updateFavButton(text);
+      renderFavorites();
+
+      // Pop animation
+      favBtn.classList.remove('pop');
+      void favBtn.offsetWidth;
+      favBtn.classList.add('pop');
+    }
+
+    /* ============================================================
+       UPDATE FAV BUTTON — reflects saved/unsaved state visually
+    ============================================================ */
+    function updateFavButton(text) {
+      const isSaved = state.favorites.includes(text);
+      favBtn.textContent = isSaved ? '★' : '☆';
+      favBtn.classList.toggle('favorited', isSaved);
+      favBtn.setAttribute('aria-label', isSaved ? 'Remove from favorites' : 'Save to favorites');
+      favBtn.title = isSaved ? 'Remove from favorites' : 'Save to favorites';
+    }
+
+    /* ============================================================
+       RENDER FAVORITES — updates the favorites list in the DOM
+    ============================================================ */
+    function renderFavorites() {
+      favoritesList.innerHTML = '';
+
+      if (state.favorites.length === 0) {
+        favoritesList.appendChild(favoritesEmpty);
+        favoritesEmpty.style.display = '';
+        return;
+      }
+
+      favoritesEmpty.style.display = 'none';
+
+      state.favorites.forEach((item) => {
+        const el = document.createElement('div');
+        el.className = 'favorites-item';
+        el.setAttribute('role', 'listitem');
+
+        const textSpan = document.createElement('span');
+        textSpan.textContent = item;
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'fav-remove-btn';
+        removeBtn.textContent = '✕';
+        removeBtn.setAttribute('aria-label', 'Remove from favorites');
+        removeBtn.addEventListener('click', () => {
+          state.favorites = state.favorites.filter(f => f !== item);
+          saveToStorage();
+          // If current compliment was just removed, update the star button
+          if (complimentText.textContent === item) {
+            updateFavButton(item);
+          }
+          renderFavorites();
+        });
+
+        el.appendChild(textSpan);
+        el.appendChild(removeBtn);
+        favoritesList.appendChild(el);
+      });
+    }
+
+    /* ============================================================
+       HANDLE CLEAR FAVORITES
+    ============================================================ */
+    function handleClearFavorites() {
+      state.favorites = [];
+      saveToStorage();
+      updateFavButton(complimentText.textContent);
+      renderFavorites();
     }
 
     /* ============================================================
